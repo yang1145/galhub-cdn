@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GalHub - 游戏CDN平台</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #667eea;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        .games-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .game-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .game-card a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+        }
+        .game-card a:hover {
+            background-color: #5a6fd8;
+        }
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>GalHub - 游戏CDN平台</h1>
+        
+        <div class="section">
+            <h2>平台介绍</h2>
+            <p>GalHub是一个专业的网页游戏平台，专为网页游戏开发者和小型游戏平台运营者设计。</p>
+        </div>
+        
+        <div class="section">
+            <h2>使用说明</h2>
+            <ol>
+                <li>通过管理界面或命令行上传您的游戏</li>
+                <li>系统自动为您生成访问链接</li>
+                <li>分享链接给玩家即可开始游戏</li>
+                <li>随时管理您的游戏列表</li>
+            </ol>
+        </div>
+        
+        <div class="section">
+            <h2>可用游戏</h2>
+            <div id="games-container">
+                <p>正在加载游戏列表...</p>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 GalHub - 网页游戏CDN平台</p>
+        </footer>
+    </div>
+
+    <script>
+        // 动态加载游戏列表
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/games')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('games-container');
+                    if (data.games && data.games.length > 0) {
+                        let html = '<div class="games-list">';
+                        data.games.forEach(game => {
+                            html += `
+                                <div class="game-card">
+                                    <div><strong>${game.name}</strong></div>
+                                    <div>别名: ${game.alias}</div>
+                                    <div>上传时间: ${game.upload_time}</div>
+                                    <a href="/${game.alias}/">开始游戏</a>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = '<p>暂无游戏，请稍后查看。</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading games:', error);
+                    document.getElementById('games-container').innerHTML = '<p>加载失败，请稍后重试。</p>';
+                });
+        });
+    </script>
+</body>
+</html>

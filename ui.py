@@ -3,8 +3,9 @@ from tkinter import ttk, messagebox, filedialog
 import os
 from database import init_db, get_all_games, get_domain, set_domain
 from manager import upload_game, remove_game, init_manager, get_game_url, update_domain
-from server import start_server
+from server import start_server, stop_server, get_server_logs
 import threading
+import time
 
 # 尝试导入pyperclip，如果失败则设置为None
 try:
@@ -19,6 +20,10 @@ class GameCDNUI:
         self.root = root
         self.root.title("GalHub - CDN控制器")
         self.root.geometry("900x700")
+        
+        # 服务器相关变量
+        self.server_thread = None
+        self.log_update_job = None
         
         # 初始化数据库
         init_manager()
@@ -199,6 +204,25 @@ class GameCDNUI:
         ttk.Label(server_frame, text="启动服务器后，可通过以下地址访问:").pack(anchor="w", pady=(30, 5))
         self.url_label = ttk.Label(server_frame, text="http://localhost:8000", foreground="blue")
         self.url_label.pack(anchor="w")
+        
+        # 日志显示区域
+        log_frame = ttk.LabelFrame(self.server_tab, text="服务器日志", padding="10")
+        log_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # 创建日志文本框和滚动条
+        log_text_frame = ttk.Frame(log_frame)
+        log_text_frame.pack(fill="both", expand=True)
+        
+        self.log_text = tk.Text(log_text_frame, height=10, state="disabled")
+        log_scrollbar = ttk.Scrollbar(log_text_frame, orient="vertical", command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scrollbar.pack(side="right", fill="y")
+        
+        # 清空日志按钮
+        clear_log_button = ttk.Button(log_frame, text="清空日志", command=self.clear_logs)
+        clear_log_button.pack(anchor="e", pady=(10, 0))
     
     def create_settings_tab(self):
         # 设置区域
@@ -398,15 +422,54 @@ class GameCDNUI:
         self.stop_button.config(state="normal")
         self.url_label.config(text=f"http://localhost:{port}")
         
+        # 开始更新日志
+        self.update_logs()
+        
         messagebox.showinfo("服务器启动", f"服务器已在端口 {port} 上启动")
     
     def stop_server(self):
-        # 注意：由于Python的HTTP服务器限制，无法直接停止线程
-        # 这里仅更新UI状态
+        # 停止服务器
+        success = stop_server()
+        
+        # 更新UI
         self.server_status.config(text="服务器状态: 已停止", foreground="red")
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
-        messagebox.showinfo("服务器停止", "服务器已停止。注意：程序仍在后台运行，需要完全停止请关闭整个应用程序。")
+        
+        # 停止日志更新
+        if self.log_update_job:
+            self.root.after_cancel(self.log_update_job)
+            self.log_update_job = None
+        
+        if success:
+            messagebox.showinfo("服务器停止", "服务器已停止")
+        else:
+            messagebox.showinfo("服务器停止", "已请求停止服务器。注意：程序仍在后台运行，需要完全停止请关闭整个应用程序。")
+    
+    def update_logs(self):
+        """更新日志显示"""
+        try:
+            logs = get_server_logs()
+            if logs:
+                self.log_text.config(state="normal")
+                self.log_text.delete(1.0, tk.END)
+                for log in logs:
+                    self.log_text.insert(tk.END, log + "\n")
+                self.log_text.config(state="disabled")
+                # 滚动到底部
+                self.log_text.see(tk.END)
+        except Exception as e:
+            print(f"Error updating logs: {e}")
+        
+        # 每秒更新一次日志
+        if self.server_thread and self.server_thread.is_alive():
+            self.log_update_job = self.root.after(1000, self.update_logs)
+    
+    def clear_logs(self):
+        """清空日志显示"""
+        self.log_text.config(state="normal")
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state="disabled")
     
     def load_domain_settings(self):
         """加载域名设置"""
