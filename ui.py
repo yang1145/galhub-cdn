@@ -6,6 +6,7 @@ from manager import upload_game, remove_game, init_manager, get_game_url, update
 from server import start_server, stop_server, get_server_logs
 import threading
 import time
+from datetime import datetime
 
 # 尝试导入pyperclip，如果失败则设置为None
 try:
@@ -49,6 +50,10 @@ class GameCDNUI:
         self.server_tab = ttk.Frame(tab_control)
         tab_control.add(self.server_tab, text="服务器控制")
         
+        # 日志查看标签页
+        self.log_tab = ttk.Frame(tab_control)
+        tab_control.add(self.log_tab, text="日志查看")
+        
         # 设置标签页
         self.settings_tab = ttk.Frame(tab_control)
         tab_control.add(self.settings_tab, text="设置")
@@ -64,6 +69,9 @@ class GameCDNUI:
         
         # 服务器控制标签页内容
         self.create_server_tab()
+        
+        # 日志查看标签页内容
+        self.create_log_tab()
         
         # 设置标签页内容
         self.create_settings_tab()
@@ -223,6 +231,126 @@ class GameCDNUI:
         # 清空日志按钮
         clear_log_button = ttk.Button(log_frame, text="清空日志", command=self.clear_logs)
         clear_log_button.pack(anchor="e", pady=(10, 0))
+    
+    def create_log_tab(self):
+        # 日志查看区域
+        log_frame = ttk.LabelFrame(self.log_tab, text="日志文件查看", padding="10")
+        log_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # 日期选择区域
+        date_frame = ttk.Frame(log_frame)
+        date_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(date_frame, text="选择日期:").pack(side="left")
+        
+        # 获取可用的日志文件日期
+        log_dates = self.get_available_log_dates()
+        self.log_date_var = tk.StringVar()
+        
+        if log_dates:
+            self.log_date_var.set(log_dates[0])  # 默认选择最新日期
+            date_combo = ttk.Combobox(date_frame, textvariable=self.log_date_var, values=log_dates, state="readonly", width=15)
+            date_combo.pack(side="left", padx=(10, 10))
+        else:
+            ttk.Label(date_frame, text="暂无日志文件").pack(side="left", padx=(10, 0))
+        
+        # 刷新按钮
+        refresh_button = ttk.Button(date_frame, text="刷新", command=self.refresh_log_dates)
+        refresh_button.pack(side="left")
+        
+        # 加载按钮
+        load_button = ttk.Button(date_frame, text="加载日志", command=self.load_selected_log)
+        load_button.pack(side="left", padx=(10, 0))
+        
+        # 日志显示区域
+        log_text_frame = ttk.Frame(log_frame)
+        log_text_frame.pack(fill="both", expand=True, pady=(10, 0))
+        
+        self.file_log_text = tk.Text(log_text_frame, state="disabled")
+        log_scrollbar = ttk.Scrollbar(log_text_frame, orient="vertical", command=self.file_log_text.yview)
+        self.file_log_text.configure(yscrollcommand=log_scrollbar.set)
+        
+        self.file_log_text.pack(side="left", fill="both", expand=True)
+        log_scrollbar.pack(side="right", fill="y")
+        
+        # 操作按钮
+        button_frame = ttk.Frame(log_frame)
+        button_frame.pack(fill="x", pady=(10, 0))
+        
+        clear_button = ttk.Button(button_frame, text="清空显示", command=self.clear_file_logs)
+        clear_button.pack(side="right")
+        
+        # 如果有日志文件，自动加载最新日志
+        if log_dates:
+            self.load_selected_log()
+    
+    def get_available_log_dates(self):
+        """获取可用的日志文件日期"""
+        log_dates = []
+        logs_dir = "logs"
+        
+        if os.path.exists(logs_dir) and os.path.isdir(logs_dir):
+            for filename in os.listdir(logs_dir):
+                if filename.startswith("server_") and filename.endswith(".log"):
+                    # 提取日期部分
+                    date_part = filename[7:-4]  # 去掉 "server_" 前缀和 ".log" 后缀
+                    log_dates.append(date_part)
+            
+            # 按日期倒序排列（最新的在前）
+            log_dates.sort(reverse=True)
+        
+        return log_dates
+    
+    def refresh_log_dates(self):
+        """刷新日志日期列表"""
+        log_dates = self.get_available_log_dates()
+        
+        # 更新下拉框
+        date_combo = None
+        for widget in self.log_tab.winfo_children():
+            if isinstance(widget, ttk.LabelFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ttk.Frame):
+                        for subchild in child.winfo_children():
+                            if isinstance(subchild, ttk.Combobox):
+                                date_combo = subchild
+                                break
+        
+        if date_combo:
+            date_combo['values'] = log_dates
+            if log_dates:
+                self.log_date_var.set(log_dates[0])
+    
+    def load_selected_log(self):
+        """加载选中的日志文件"""
+        selected_date = self.log_date_var.get()
+        if not selected_date:
+            messagebox.showwarning("警告", "请先选择一个日期")
+            return
+        
+        log_filename = f"logs/server_{selected_date}.log"
+        
+        if not os.path.exists(log_filename):
+            messagebox.showerror("错误", f"日志文件不存在: {log_filename}")
+            return
+        
+        try:
+            with open(log_filename, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            self.file_log_text.config(state="normal")
+            self.file_log_text.delete(1.0, tk.END)
+            self.file_log_text.insert(tk.END, content)
+            self.file_log_text.config(state="disabled")
+            self.file_log_text.see(tk.END)
+        except Exception as e:
+            messagebox.showerror("错误", f"读取日志文件时出错: {str(e)}")
+    
+    def clear_file_logs(self):
+        """清空文件日志显示"""
+        self.file_log_text.config(state="normal")
+        self.file_log_text.delete(1.0, tk.END)
+        self.file_log_text.config(state="disabled")
     
     def create_settings_tab(self):
         # 设置区域

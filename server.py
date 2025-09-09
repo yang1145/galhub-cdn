@@ -13,6 +13,8 @@ from database import get_game_by_alias, get_all_games
 PORT = 8000
 # 游戏文件根目录
 GAMES_ROOT = "games"
+# 日志目录
+LOGS_DIR = "logs"
 
 # 全局变量用于存储服务器实例和日志
 server_instance = None
@@ -28,6 +30,15 @@ def get_resource_path(relative_path):
     # 开发环境
     return os.path.join(os.path.abspath("."), relative_path)
 
+def setup_log_directory():
+    """创建日志目录"""
+    os.makedirs(LOGS_DIR, exist_ok=True)
+
+def get_log_filename():
+    """获取当前日期的日志文件名"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    return os.path.join(LOGS_DIR, f"server_{today}.log")
+
 def log_message(message):
     """记录日志消息"""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -38,6 +49,16 @@ def log_message(message):
         # 限制日志数量，只保留最近的1000条
         if len(server_logs) > 1000:
             server_logs.pop(0)
+        
+        # 保存日志到文件
+        try:
+            setup_log_directory()
+            log_file = get_log_filename()
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(log_entry + "\n")
+        except Exception as e:
+            # 如果无法写入文件，至少打印到控制台
+            print(f"Failed to write to log file: {e}")
     
     # 同时打印到控制台
     print(log_entry)
